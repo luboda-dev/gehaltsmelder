@@ -1,10 +1,9 @@
 # database.py
-
 import os
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
+from typing import Optional, List
 
-# SQLAlchemy-Instanz (wird in server.py initialisiert)
 db = SQLAlchemy()
 
 # --------------------
@@ -14,14 +13,13 @@ db = SQLAlchemy()
 class Report(db.Model):
     __tablename__ = "reports"
 
-    id = db.Column(db.Integer, primary_key=True)  # automatische ID
+    id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.Text, nullable=False)
-    reported_at = db.Column(db.Text, nullable=False)  # Zeitstempel vom Client
+    reported_at = db.Column(db.Text, nullable=False)
     screenshot = db.Column(db.LargeBinary, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
-        """Hilfsfunktion für JSON-Ausgaben"""
         return {
             "id": self.id,
             "url": self.url,
@@ -31,15 +29,10 @@ class Report(db.Model):
         }
 
 # --------------------
-# Hilfsfunktion: DB initialisieren
+# Initialisierung
 # --------------------
 
 def init_db(app):
-    """
-    Verbindet SQLAlchemy mit der Flask-App
-    und erstellt alle Tabellen (falls nicht vorhanden).
-    """
-
     base_dir = os.path.abspath(os.path.dirname(__file__))
     db_path = os.path.join(base_dir, "reports.db")
 
@@ -50,3 +43,39 @@ def init_db(app):
 
     with app.app_context():
         db.create_all()
+
+# --------------------
+# DB-Service-Funktionen
+# --------------------
+
+def create_report(
+    url: str,
+    reported_at: str,
+    screenshot: Optional[bytes] = None
+) -> Report:
+    """
+    Erstellt und speichert eine neue Meldung.
+    """
+    report = Report(
+        url=url,
+        reported_at=reported_at,
+        screenshot=screenshot
+    )
+
+    db.session.add(report)
+    db.session.commit()
+    return report
+
+
+def get_all_reports() -> List[Report]:
+    """
+    Gibt alle gespeicherten Meldungen zurück.
+    """
+    return Report.query.order_by(Report.created_at.desc()).all()
+
+
+def get_report_count() -> int:
+    """
+    Gibt die Anzahl der Meldungen zurück.
+    """
+    return Report.query.count()
