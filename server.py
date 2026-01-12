@@ -6,9 +6,13 @@ import base64
 import traceback
 import json
 from threading import Lock
+from database import init_db, create_report, get_report_count
 
 app = Flask(__name__)
 CORS(app)
+
+# Datenbank initialisieren
+init_db(app)
 
 # Mailgun / Zieladresse (in Render als Environment-Variables setzen)
 MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
@@ -46,7 +50,8 @@ def home():
 
 @app.route("/count", methods=["GET"])
 def get_count():
-    return jsonify({"count": counter})
+    return jsonify({"count": get_report_count()})
+    # return jsonify({"count": counter})
 
 @app.route("/report", methods=["POST"])
 def report():
@@ -72,6 +77,7 @@ def report():
 """
 
         files = None
+        img_bytes = None
         if screenshot_data:
             # screenshot_data ist dataURL: "data:image/png;base64,...."
             try:
@@ -100,14 +106,22 @@ def report():
         if resp.status_code not in (200, 201):
             print("Mailgun error:", resp.status_code, resp.text)
             return jsonify({"success": False, "error": resp.text}), resp.status_code
-
+            
+        # ✅ HIER: Datenbank-Speicherung
+        create_report(
+            url=url,
+            reported_at=time,
+            screenshot=img_bytes if screenshot_data else None
+        )
+        
         # Mail erfolgreich queued -> Counter erhöhen (threadsafe)
         with _counter_lock:
             counter += 1
             save_counter(counter)
 
         print("✅ Email queued via Mailgun. Counter:", counter)
-        return jsonify({"success": True, "count": counter})
+        return jsonify({"success": True, "count": get_report_count()})
+        #return jsonify({"success": True, "count": counter})
 
     except Exception as e:
         print("❌ Fehler beim Verarbeiten der Meldung:", e)
