@@ -60,7 +60,7 @@ def get_count():
 def admin_dashboard():
     # 1. 🔑 Einfache Passwort-Abfrage via URL-Parameter
     provided_key = request.args.get("key")
-    if not ADMIN_SECRET or provided_secret != ADMIN_SECRET:
+    if not ADMIN_SECRET or provided_key != ADMIN_SECRET:
         return "🛑 Zugriff verweigert: Ungültiger Admin-Key", 403
 
     # 2. 📊 Daten aus der DB laden
