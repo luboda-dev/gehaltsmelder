@@ -163,9 +163,14 @@ def report():
         files = None
         img_bytes = None
 
-        #erstellen eines PDF Drucks der website
-        print(f"📄 Erstelle PDF-Abdruck für {url}...")
-        pdf_bytes = create_pdf_from_url(url)
+
+        
+        #erstellen eines PDF Drucks der website -> Vorübergehend ausgesetzt wegen Serverlimitationen
+        # print(f"📄 Erstelle PDF-Abdruck für {url}...")
+        # pdf_bytes = create_pdf_from_url(url)
+        # if pdf_bytes:
+        #    files.append(("attachment", ("beweis_abdruck.pdf", pdf_bytes, "application/pdf")))
+        #    print("✅ PDF erfolgreich an E-Mail angehängt.")
         
         if screenshot_data:
             # screenshot_data ist dataURL: "data:image/png;base64,...."
@@ -174,9 +179,6 @@ def report():
                 files = [("attachment", ("screenshot.png", img_bytes, "image/png"))]
             except Exception as e:
                 print("Warnung: Konnte screenshot nicht decodieren:", e)
-        if pdf_bytes:
-            files.append(("attachment", ("beweis_abdruck.pdf", pdf_bytes, "application/pdf")))
-            print("✅ PDF erfolgreich an E-Mail angehängt.")
 
         # Mailgun API-Aufruf
         if not MAILGUN_API_KEY or not MAILGUN_DOMAIN or not TO_ADDRESS:
