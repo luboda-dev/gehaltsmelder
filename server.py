@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string, Response
 from flask_cors import CORS
 import os
 import requests
@@ -21,6 +21,7 @@ MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")         # z.B. sandboxXXXXX.mailgun
 TO_ADDRESS = os.getenv("TO_ADDRESS")                 # z.B. deine Empfänger-Adresse
 FROM_EMAIL = os.getenv("FROM_EMAIL") or f"Gehaltsmelder <mailgun@{MAILGUN_DOMAIN}>"
 AUTH_SECRET = os.getenv("GEHALTSMELDER_SECRET")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET")
 
 # Counter-Datei (einfacher Persistenz-Mechanismus)
 COUNTER_FILE = "counter.json"
@@ -54,6 +55,75 @@ def home():
 def get_count():
     return jsonify({"count": get_report_count()})
     # return jsonify({"count": counter})
+
+@app.route("/admin/dashboard")
+def admin_dashboard():
+    # 1. 🔑 Einfache Passwort-Abfrage via URL-Parameter
+    provided_key = request.args.get("key")
+    if not ADMIN_SECRET or provided_secret != ADMIN_SECRET:
+        return "🛑 Zugriff verweigert: Ungültiger Admin-Key", 403
+
+    # 2. 📊 Daten aus der DB laden
+    from database import get_all_reports
+    reports = get_all_reports()
+
+    # 3. 🎨 Minimales HTML-Template (direkt im Code für den Anfang)
+    html_template = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Gehaltsmelder Admin</title>
+        <style>
+            body { font-family: sans-serif; margin: 40px; background: #f4f4f9; }
+            table { width: 100%; border-collapse: collapse; background: white; }
+            th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+            th { background-color: #007bff; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+            .screenshot-btn { background: #28a745; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; }
+        </style>
+    </head>
+    <body>
+        <h2>📋 Eingegangene Meldungen ({{ reports|length }})</h2>
+        <table>
+            <tr>
+                <th>Datum</th>
+                <th>URL</th>
+                <th>Gemeldet am</th>
+                <th>Aktionen</th>
+            </tr>
+            {% for r in reports %}
+            <tr>
+                <td>{{ r.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td><a href="{{ r.url }}" target="_blank">Link öffnen</a></td>
+                <td>{{ r.reported_at }}</td>
+                <td>
+                    {% if r.screenshot %}
+                        <a class="screenshot-btn" href="/admin/screenshot/{{ r.id }}?key={{ key }}" target="_blank">Screenshot</a>
+                    {% else %}
+                        Kein Bild
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
+    """
+    return render_template_string(html_template, reports=reports, key=provided_key)
+
+@app.route("/admin/screenshot/<int:report_id>")
+def view_screenshot(report_id):
+    provided_key = request.args.get("key")
+    if provided_key != ADMIN_SECRET:
+        return "Unbefugt", 401
+
+    from database import Report
+    report = Report.query.get_or_404(report_id)
+    
+    if not report.screenshot:
+        return "Kein Screenshot vorhanden", 404
+
+    return Response(report.screenshot, mimetype='image/png')
 
 @app.route("/report", methods=["POST"])
 def report():
