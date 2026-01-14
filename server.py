@@ -7,6 +7,7 @@ import traceback
 import json
 from threading import Lock
 from database import init_db, create_report, get_report_count
+from security import check_authorization_and_rate_limit
 
 app = Flask(__name__)
 CORS(app)
@@ -19,6 +20,7 @@ MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY")
 MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN")         # z.B. sandboxXXXXX.mailgun.org
 TO_ADDRESS = os.getenv("TO_ADDRESS")                 # z.B. deine Empfänger-Adresse
 FROM_EMAIL = os.getenv("FROM_EMAIL") or f"Gehaltsmelder <mailgun@{MAILGUN_DOMAIN}>"
+AUTH_SECRET = os.getenv("GEHALTSMELDER_SECRET")
 
 # Counter-Datei (einfacher Persistenz-Mechanismus)
 COUNTER_FILE = "counter.json"
@@ -57,6 +59,15 @@ def get_count():
 def report():
     global counter
     try:
+        # ----------------------------------------------------
+        # 🔑 Aufruf der kombinierten Sicherheitsprüfung
+        # Nur AUTH_SECRET wird übergeben
+        auth_error = check_authorization_and_rate_limit(AUTH_SECRET)
+        if auth_error:
+            return auth_error 
+        # ----------------------------------------------------
+
+        
         data = request.get_json(force=True)
         print("Received data:", {k: (v if k != "screenshot" else "(screenshot)") for k,v in (data or {}).items()})
 
